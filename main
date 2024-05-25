@@ -1,0 +1,58 @@
+import wikipediaapi
+import nltk
+import re
+import pandas as pd
+from nltk.tokenize import sent_tokenize
+
+
+nltk.download('punkt')
+
+
+def fetch_wikipedia_page(title):
+    user_agent = "WikiChrono (vulturebarbatus)"
+    wiki_wiki = wikipediaapi.Wikipedia('en', headers={'User-Agent': user_agent})
+    page = wiki_wiki.page(title)
+    if not page.exists():
+        print(f"Page '{title}' does not exist.")
+        return None
+    return page.text
+
+def extract_events(text):
+    sentences = sent_tokenize(text)
+    date_pattern = re.compile(r'\b(\d{1,2}\s+\w+\s+\d{4}|\d{4})\b')
+    
+    events = []
+    for sentence in sentences:
+        if date_pattern.search(sentence):
+            events.append(sentence)
+    
+    return events
+
+def sort_events(events):
+    def extract_date(event):
+        match = re.search(r'\b(\d{1,2}\s+\w+\s+\d{4}|\d{4})\b', event)
+        if match:
+            date_str = match.group(0)
+            try:
+                return pd.to_datetime(date_str, format='%d %B %Y', errors='coerce')
+            except ValueError:
+                return pd.to_datetime(date_str, format='%Y', errors='coerce')
+        return pd.NaT
+
+    events_with_dates = [(extract_date(event), event) for event in events]
+    events_with_dates.sort()
+    return [event for date, event in events_with_dates if date is not pd.NaT]
+
+def main():
+    title = input("Enter the Wikipedia page title: ")
+    text = fetch_wikipedia_page(title)
+    
+    if text:
+        events = extract_events(text)
+        sorted_events = sort_events(events)
+        print("\nChronological Timeline of Events:")
+        for event in sorted_events:
+            print(f"- {event}")
+
+if __name__ == "__main__":
+    main()
